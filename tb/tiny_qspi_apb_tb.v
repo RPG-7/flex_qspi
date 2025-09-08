@@ -16,6 +16,16 @@ module tiny_qspi_tb();
     reg [31:0]mode_reg;
     reg [31:0]data_tgt[255:0];
     reg [31:0]data_src[255:0];
+
+    wire [3:0]QSPI_QDAT;
+    assign QSPI_QIN = QSPI_QDAT;
+    genvar j;
+    generate for(j=0;j<4;j=j+1)
+        begin:QSPI_DATGEN
+            pullup(QSPI_QDAT[j]);
+            assign QSPI_QDAT[j] = (QSPI_QOE[j])?QSPI_QOUT[j]:1'bz;
+        end
+    endgenerate
     tiny_qspi_apb DUT(
     // system
     .PRESETn(PRESETn),
@@ -34,6 +44,25 @@ module tiny_qspi_tb();
     .SCLK(SCLK),
     .MCS(MCS)
     );
+    M23A1024 Model_PSRAM(
+        .SI_SIO0(QSPI_QDAT[0]), 
+        .SO_SIO1(QSPI_QDAT[1]), 
+        .SCK(SCLK), 
+        .CS_N(MCS[1]), 
+        .SIO2(QSPI_QDAT[2]), 
+        .HOLD_N_SIO3(QSPI_QDAT[3]), 
+        .RESET(!PRESETn)
+        );
+    W25Q128JVxIM Model_Flash
+    (
+        .CSn(MCS[0]), 
+        .CLK(SCLK), 
+        .DIO(QSPI_QDAT[0]), 
+        .DO(QSPI_QDAT[1]), 
+        .WPn(QSPI_QDAT[2]), 
+        .HOLDn(QSPI_QDAT[3])
+    );
+
     initial
     forever 
     begin
@@ -41,10 +70,10 @@ module tiny_qspi_tb();
         #10  PCLK=1'b0;
     end
     
-    /* QSPI gibberish block */
+    /* QSPI gibberish block 
     always@(posedge SCLK)
         QSPI_QIN<=$random;
-    
+    */
     task reset;
         begin
             $display("------------------reset the APB_SPI,Active low-----------------------");
@@ -338,7 +367,7 @@ module tiny_qspi_tb();
         $dumpfile(`WAVE_NAME);
         $dumpvars;
     `endif    
-        QSPI_QIN=4'h0;
+        //QSPI_QIN=4'h0;
         reset;
         apb_xfer(32'h0,1'b1,32'h00000000,apb_rddata);/*config at fastest normal mode*/
         for(i=0;i<32;i=i+1) /*SPI aligned read test*/
