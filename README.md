@@ -63,6 +63,8 @@ base+8  R status event pending register
 		[8] CRF_EN Command Rx Buffer Full
 		[9] TXBF Tx Buffer Full
 
+        W Clear pending status / interrupt 
+
 base+12 RW Devsel (normal mode only)
 
 base+16 R intr pending register
@@ -122,7 +124,7 @@ CPU and this core might reduce performance.
 
 1. update TB to test with real device read / write
 2. implement command memory mode and related commands (CMD_DONE / JMP / MOV) (maybe memory multiplexed with APB FIFO memory?)
-3. add DMA/EMC data interface (AXIS cmd / rdata / wdata / cmd_receipt)
+3. add DMA/EMC data interface (AXIS cmd / rdata / wdata / cmd_receipt / DREQ / DACK)
 4. modify PSRAM controller to be generic EMC
 5. add AXI4 interface support
 6. add OSPI and selectable JTAG / SDIO support (choose one from 3 options:(SPI/D/Q/OSPI) / (SPI/SDIO) / (SPI/JTAG) )

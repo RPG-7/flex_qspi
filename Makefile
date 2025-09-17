@@ -14,7 +14,7 @@ RUN_ARGS += -DWAVE_NAME=\"$(SIM_TOP).vcd\"
 
 comp:
 	@mkdir -p build
-	cd build && (${SIM_TOOL} -g2005-sv ../src/*.v ../tb/*.v ../model/*.v ../model/*.sv $(RUN_ARGS))
+	cd build && (${SIM_TOOL} ../src/*.v ../tb/*.v ../model/*.v ../model/*.sv $(RUN_ARGS))
 
 run: comp
 	cd build && vvp ./a.out

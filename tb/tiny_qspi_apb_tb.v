@@ -7,7 +7,7 @@ module tiny_qspi_tb();
     reg [31:0] APB2SPI_PWDATA;
     reg [4:0]    APB2SPI_PADDR;
     wire APB2SPI_PSLVERR,APB2SPI_PREADY,APB2SPI_INTERRUPT;//output
-    reg  [3:0]	QSPI_QIN;
+    wire [3:0]	QSPI_QIN;
     wire [3:0]	QSPI_QOUT;
     wire [3:0]	QSPI_QOE;
     wire 	  	SCLK;
@@ -16,6 +16,7 @@ module tiny_qspi_tb();
     reg [31:0]mode_reg;
     reg [31:0]data_tgt[255:0];
     reg [31:0]data_src[255:0];
+    reg [3:0] QSPI_GIBERRISH; // in order to perform R/W unit test
 
     wire [3:0]QSPI_QDAT;
     assign QSPI_QIN = QSPI_QDAT;
@@ -23,7 +24,8 @@ module tiny_qspi_tb();
     generate for(j=0;j<4;j=j+1)
         begin:QSPI_DATGEN
             pullup(QSPI_QDAT[j]);
-            assign QSPI_QDAT[j] = (QSPI_QOE[j])?QSPI_QOUT[j]:1'bz;
+            assign QSPI_QDAT[j] = (QSPI_QOE[j])?QSPI_QOUT[j]:
+                                    (!MCS[2])?QSPI_GIBERRISH[i]:1'bz;
         end
     endgenerate
     tiny_qspi_apb DUT(
@@ -69,11 +71,78 @@ module tiny_qspi_tb();
         #10  PCLK=1'b1;
         #10  PCLK=1'b0;
     end
+    reg [1:0] TEST_MODE=0; 
+    reg [2:0] testsft_cnt;
+    reg [7:0] testdata_cnt;
+    reg [7:0] testdata_sft;
+    /* QSPI test data(read) block */
+    always@(posedge SCLK or posedge MCS[2])
+    if(MCS[2])
+    begin
+        testdata_cnt<=0;
+        testdata_sft<=0;
+        testsft_cnt<=0;
+    end
+    else
+    begin
+        case(TEST_MODE)
+        2'b00:
+        begin
+            testdata_sft<={testdata_sft[6:0],QSPI_QDAT[0]}; 
+            if(testsft_cnt<7)
+            begin  
+                testsft_cnt<=testsft_cnt+1;
+                testdata_cnt<=0;
+            end
+            else
+            begin
+                testsft_cnt<=testsft_cnt;
+                testdata_cnt<=testdata_cnt+1;
+            end
+        end
+        2'b01:
+        begin
+            testdata_sft<={testdata_sft[5:0],QSPI_QDAT[1:0]}; 
+            if(testsft_cnt<3)
+            begin  
+                testsft_cnt<=testsft_cnt+1;
+                testdata_cnt<=0;
+            end
+            else
+            begin
+                testsft_cnt<=testsft_cnt;
+                testdata_cnt<=testdata_cnt+1;
+            end
+        end
+        2'b10:
+        begin
+            testdata_sft<={testdata_sft[3:0],QSPI_QDAT}; 
+            if(testsft_cnt<1)
+            begin  
+                testsft_cnt<=testsft_cnt+1;
+                testdata_cnt<=0;
+            end
+            else
+            begin
+                testsft_cnt<=testsft_cnt;
+                testdata_cnt<=testdata_cnt+1;
+            end
+        end
+        2'b11:
+        begin//RESERVED FOR OSPI
+            testdata_cnt<=0;
+            testdata_sft<=0;    
+        end
+        endcase
+    end
     
-    /* QSPI gibberish block 
-    always@(posedge SCLK)
-        QSPI_QIN<=$random;
-    */
+    always@(negedge SCLK)
+    if(!MCS[2])
+        QSPI_GIBERRISH<=$random;
+    else
+        QSPI_GIBERRISH<=4'h0;
+    
+    
     task reset;
         begin
             $display("------------------reset the APB_SPI,Active low-----------------------");
@@ -324,10 +393,38 @@ module tiny_qspi_tb();
 
     endtask
     task cmd_loop_test;
-    input [3:0]loop_mode;
+    input [1:0]loop_mode;
+    reg [15:0]timeout_cnt;
     //input 
-    begin
-        $display("TBD!");
+    reg [7:0]pattern_byte;
+    reg loop_escape;
+    integer i;
+    begin //testdata_cnt
+        TEST_MODE=0;
+        loop_escape=0;
+        pattern_byte=8'h01;
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b11111011},apb_rddata);
+        apb_xfer(32'h18,1'b1,32'h03,apb_rddata);//write a low timeout value
+        for(i=0;i<4;i=i+1)
+        begin
+            loop_escape=0;
+            apb_xfer(32'h14,1'b1,{20'h00000,4'h8+loop_mode,pattern_byte},apb_rddata);
+            apb_xfer(32'h08,1'b0,32'h00000000,apb_rddata);
+            for(timeout_cnt=16'hFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
+            begin
+                apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
+                loop_escape = (apb_rddata & 32'hC0)!=0;
+            end
+            if(apb_rddata[7] & !apb_rddata[6])
+                $display("CMD finished with success!");
+            else if(apb_rddata[6])
+                $display("CMD timeout as intended!");
+            else
+                $display("CMD FSM stuck!");
+            
+            apb_xfer(32'h08,1'b1,32'h00000FFF,apb_rddata);
+        end
+        //$display("TBD!");
     end
     endtask
 
@@ -336,12 +433,13 @@ module tiny_qspi_tb();
     reg loop_escape;
     begin
         toggle_reg=8'h01;
+        loop_escape=0;
         for(i=0;i<9;i=i+1)
         begin
             apb_xfer(32'h14,1'b1,{20'h00000,4'hF,~toggle_reg},apb_rddata);
             toggle_reg=toggle_reg<<1;
         end
-        for(timeout_cnt=8'hff;(timeout_cnt!=0 & (loop_escape!=0));timeout_cnt=timeout_cnt-1)
+        for(timeout_cnt=8'hff;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
         begin
             apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
             loop_escape = (apb_rddata & 32'h80)!=0;
@@ -431,3 +529,4 @@ module tiny_qspi_tb();
     end
 
 endmodule
+

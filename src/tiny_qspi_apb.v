@@ -214,12 +214,13 @@ module tiny_qspi_apb(
 	//Configure register
 	reg [7:0]	baud_reg;
 	reg op_mode;
-	reg [8:0] intr_mask;
 	reg msb_first;
 	reg		  cpolr, cphar;
 	//Intr penging
 	wire [9:0] spi_events;
-	wire [8:0] intr_pending;
+	wire [9:0] intr_pending;
+	reg [9:0] intr_mask;
+	wire [9:0] event_pending;
 
 	//
 	wire [7:0]cmdfifo_waterlvl;
@@ -262,13 +263,13 @@ module tiny_qspi_apb(
 	wire [31:0]txfifo_in,rxfifo_out;
 	wire txfifo_halfway,rxfifo_halfway;
 	wire rxfifo_wr_halfway,txfifo_rd_halfway;
-
 	assign PREADY = 1'b1; // zero wait
 	assign wr = PENABLE & PSEL & PWRITE & PREADY;
 	assign rd = PENABLE & PSEL & (!PWRITE) & PREADY;
 	assign txfifo_write = wr & (adr_i == 1);
 	assign rxfifo_read  = rd & (adr_i == 1);
 	assign cmdfifo_write= wr & (adr_i == 5);
+	assign cmdto_write= wr & (adr_i == 6);
 
 	assign istb = wr & (adr_i == 0);
 	assign dstb = wr & (adr_i == 3);
@@ -277,7 +278,7 @@ module tiny_qspi_apb(
 	case(adr_i)
 		3'h0:PRDATA={1'b1,op_mode,msb_first,10'b0,intr_mask,cpolr,cphar,baud_reg} ;
 		3'h1:PRDATA=rxfifo_out;
-		3'h2:PRDATA={22'h0,spi_events};
+		3'h2:PRDATA={22'h0,{spi_events[9],event_pending[8],spi_events[7:0]}};
 		3'h3:PRDATA=MCS;
 		3'h4:PRDATA={24'h0,intr_pending};
 		3'h5:PRDATA=32'h0;
@@ -310,6 +311,16 @@ module tiny_qspi_apb(
 		else
 			MCS <= MCS;
     end
+	always @(posedge PCLK or posedge rst_i)
+    begin
+		if (rst_i)
+			cmdto_cmp <= 24'hFFFFFF;
+		else if (cmdto_write)
+			cmdto_cmp <= PWDATA;
+		else
+			cmdto_cmp <= cmdto_cmp;
+    end
+
 	/*Todo: some intr related signals needed here*/
 	assign { cpol, cpha } = ((SPI_MODE >= 0) & (SPI_MODE < 4)) ?
 							SPI_MODE : { cpolr, cphar };
@@ -327,15 +338,16 @@ module tiny_qspi_apb(
 	assign tx_end = txfifo_empty;
 	//assign tx_rdy = !txfifo_full;
 	assign int_o = |intr_pending;
+	assign intr_pending = event_pending & intr_mask;
 	intr_mgmt#(	
-			.INTR_NUM(9),
-			.INTR_CFG({9{`INTR_PEDGE}})
+			.INTR_NUM(10),
+			.INTR_CFG({10{`INTR_PEDGE}})
 	)intr_mgmt_inst(
 		.clk(PCLK),
 		.intr_src(spi_events),
 		.intr_clr(wr && (adr_i == 2)),
 		.intr_clr_sel(PWDATA[8:0]),
-		.intr_sig(intr_pending)
+		.intr_sig(event_pending)
 	);
 	tiny_qspi_krnl qspi_fsm(
 		.clk(PCLK),
