@@ -278,7 +278,7 @@ module tiny_qspi_apb(
 	case(adr_i)
 		3'h0:PRDATA={1'b1,op_mode,msb_first,10'b0,intr_mask,cpolr,cphar,baud_reg} ;
 		3'h1:PRDATA=rxfifo_out;
-		3'h2:PRDATA={22'h0,{spi_events[9],event_pending[8],spi_events[7:0]}};
+		3'h2:PRDATA={22'h0,{spi_events[9:7],event_pending[6],spi_events[5:0]}};
 		3'h3:PRDATA=MCS;
 		3'h4:PRDATA={24'h0,intr_pending};
 		3'h5:PRDATA=32'h0;
@@ -344,9 +344,10 @@ module tiny_qspi_apb(
 			.INTR_CFG({10{`INTR_PEDGE}})
 	)intr_mgmt_inst(
 		.clk(PCLK),
+		.rst(rst_i),
 		.intr_src(spi_events),
 		.intr_clr(wr && (adr_i == 2)),
-		.intr_clr_sel(PWDATA[8:0]),
+		.intr_clr_sel(PWDATA[9:0]),
 		.intr_sig(event_pending)
 	);
 	tiny_qspi_krnl qspi_fsm(

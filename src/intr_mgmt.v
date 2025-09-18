@@ -6,7 +6,7 @@ module intr_mgmt#(
     parameter   INTR_NUM=8,
                 INTR_CFG={INTR_NUM{`INTR_PEDGE}}
 )(
-    input clk,
+    input clk,rst,
     input [INTR_NUM-1:0]intr_src,
     input intr_clr,
     input [INTR_NUM-1:0]intr_clr_sel,
@@ -14,13 +14,22 @@ module intr_mgmt#(
 );
 reg [INTR_NUM-1:0]intr_pend,intr_pulse;
 genvar j;
-always@(posedge clk)
+always@(posedge clk or posedge rst)
+if(rst)
+    intr_sig<=1'b0;
+else
     intr_sig<=(intr_clr)?(intr_sig & (~intr_clr_sel)):(intr_sig | intr_pulse);
 generate //GPIO Int type block
 for (j=0 ;j<INTR_NUM ;j=j+1 ) //if(GPIO_INTENABLE)
 begin:GPIOINT_BLK
-    always@(posedge clk)
+    always@(posedge clk or posedge rst)
+    if(rst)
     begin
+        intr_pend<=0;
+        intr_pulse<=0;
+    end
+    else
+    begin        
         if(INTR_CFG[(j+1)*2-1]==1'b0)
             intr_pend[j]<=intr_src[j];
         case(INTR_CFG[(j+1)*2-1:(j*2)])

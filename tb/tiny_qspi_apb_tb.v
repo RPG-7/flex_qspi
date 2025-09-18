@@ -415,9 +415,9 @@ module tiny_qspi_tb();
                 apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
                 loop_escape = (apb_rddata & 32'hC0)!=0;
             end
-            if(apb_rddata[7] & !apb_rddata[6])
+            if(apb_rddata[7:6] ===2'b10 )
                 $display("CMD finished with success!");
-            else if(apb_rddata[6])
+            else if(apb_rddata[7:6] ===2'b11 )
                 $display("CMD timeout as intended!");
             else
                 $display("CMD FSM stuck!");

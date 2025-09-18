@@ -19,8 +19,8 @@ localparam CNTWID = $clog2(DDEPTH);
 reg [CNTWID-1:0] wptr;
 reg [CNTWID-1:0] rptr;
 wire [CNTWID-1:0] wptr_next,rptr_next;
-reg [DWID-1:0]memory[DDEPTH-1:0] /*synthesis ram_style = dram*/;
 reg [DWID-1:0]wr_buf,rsav;
+wire [DWID-1:0]ram_rdata;
 wire full_cmp,empty_cmp;
 wire wen_internal,ren_internal;
 
@@ -32,7 +32,7 @@ assign wptr_next=(full)?wptr:wptr+wen_internal;
 assign rptr_next=(empty)?rptr:rptr+ren_internal;
 assign about_empty=(fifoen)?empty_cmp:empty;
 assign rdata=(fifoen)?
-                    (ren_internal)?memory[rptr]:rsav:
+                    (ren_internal)?ram_rdata:rsav:
                     wr_buf;
 always@(posedge clk or posedge rst)//PTRs
 begin
@@ -53,7 +53,7 @@ begin
             rptr<=rptr;
     end
 end
-
+/*
 always@(posedge clk)//data
 begin
     if(fifoen)
@@ -62,6 +62,18 @@ begin
     end
     //else if(wen&empty)wr_buf<=wdata;
 end
+*/
+asram_pdp #(
+    .DWID(DWID),
+    .DDEPTH(DDEPTH)
+)ram_core(
+    .raddr(rptr),
+    .waddr(wptr),
+    .we(fifoen & wen),
+    .clk(clk),
+    .wdata(wdata),
+    .rdata(ram_rdata)
+);
 always@(posedge clk or posedge rst)//data
 if(rst)
     wr_buf<=0;
