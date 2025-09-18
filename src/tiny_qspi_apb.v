@@ -467,10 +467,10 @@ module tiny_qspi_apb(
 			else 
 				cmdfsm_stat_next=CMDFSM_EXEC;
 		CMDFSM_WAIT:
-			if(!load_flag)
-				cmdfsm_stat_next=CMDFSM_WAIT;
-			else if(cmdto_cnt==0)
+			if(cmdto_cnt==0)
 				cmdfsm_stat_next=CMDFSM_ABRT;
+			else if((!load_flag) && cmd_keep_looping)
+				cmdfsm_stat_next=CMDFSM_WAIT;
 			else if(cmd_keep_looping)
 				cmdfsm_stat_next=CMDFSM_EXEC;
 			// else if(!cmdfifo_empty && op_mode)

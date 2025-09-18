@@ -17,6 +17,7 @@ module tiny_qspi_tb();
     reg [31:0]data_tgt[255:0];
     reg [31:0]data_src[255:0];
     reg [3:0] QSPI_GIBERRISH; // in order to perform R/W unit test
+    reg [31:0]apb_rddata;
 
     wire [3:0]QSPI_QDAT;
     assign QSPI_QIN = QSPI_QDAT;
@@ -143,7 +144,7 @@ module tiny_qspi_tb();
         QSPI_GIBERRISH<=4'h0;
     
     
-    task reset;
+    task qspictl_reset;
         begin
             $display("------------------reset the APB_SPI,Active low-----------------------");
             #100
@@ -458,7 +459,58 @@ module tiny_qspi_tb();
     end
     endtask
 
-    reg [31:0]apb_rddata;
+    task cmd_sram_spi_rw_test;
+    reg [15:0] timeout_cnt;
+    reg [31:0]datagen;
+    reg loop_escape;
+    integer i,err_cnt;
+    begin
+        $display("Start SRAM SPI R/W test!");
+        loop_escape=0;err_cnt=0;
+        apb_xfer(32'h18,1'b1,{20'h00000,12'hFFF},apb_rddata);//set longer limit
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h0},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h02},apb_rddata);//write CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h78},apb_rddata);//write 128byte data
+        for(i=0;i<31;i=i+1)
+        begin
+            datagen=$random;
+            apb_xfer(32'h04,1'b1,datagen,apb_rddata);
+            data_src[i]=datagen;
+        end
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h0},apb_rddata);//write read cmd
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h2,8'h80},apb_rddata);//read 128byte data
+        for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
+        begin
+            apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
+            loop_escape = (apb_rddata & 32'hC0)!=0;
+        end
+        if(loop_escape)
+        begin
+            err_cnt=0;
+            $display("Seems command sequence done!");
+            for(i=0;i<31;i=i+1)
+            begin
+                apb_xfer(32'h04,1'b0,datagen,apb_rddata);
+                if(data_src[i]!=apb_rdata)
+                begin
+                    $display("Data Cmp fail! exp:0x%x got:0x%x",data_src[i],apb_rdata);
+                    err_cnt++;
+                end
+            end
+            if(err_cnt===0)
+                $display("PSRAM W/R test pass!");
+        end
+        else
+            $display("Command sequence timeout!!!");
+    end
+    endtask
+
     integer i;
     initial begin /*Test module*/
     `ifdef WAVE_ON
@@ -466,7 +518,7 @@ module tiny_qspi_tb();
         $dumpvars;
     `endif    
         //QSPI_QIN=4'h0;
-        reset;
+        qspictl_reset;
         apb_xfer(32'h0,1'b1,32'h00000000,apb_rddata);/*config at fastest normal mode*/
         for(i=0;i<32;i=i+1) /*SPI aligned read test*/
         begin
@@ -510,7 +562,7 @@ module tiny_qspi_tb();
             /*compare data TBD*/
         end
         /*command mode test*/
-        reset;
+        qspictl_reset;
         $display("Start testing CMD mode");
         apb_xfer(32'h0,1'b1,32'h40000000,apb_rddata);/*config at fastest cmd mode*/
         apb_xfer(32'h18,1'b1,32'h0000FFFF,apb_rddata);/*config at fastest cmd mode*/
@@ -525,6 +577,7 @@ module tiny_qspi_tb();
         for(i=0;i<4;i=i+1)
             cmd_loop_test(i);
         cmd_dummy_test($random);
+        cmd_sram_spi_rw_test;
         $finish();
     end
 
