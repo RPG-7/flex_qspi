@@ -156,7 +156,7 @@ module tiny_qspi_tb();
         end
     endtask
     wire apb_reply_valid = PCLK & APB2SPI_PREADY;
-    reg [31:0] apb_rdata;
+    //reg [31:0] apb_rdata;
     task apb_xfer;// finish data read/write
         //input mode;
         //input [1:0]addr1;
@@ -485,6 +485,7 @@ module tiny_qspi_tb();
         apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h0},apb_rddata);//write read cmd
         apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'h2,8'h80},apb_rddata);//read 128byte data
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
         for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
         begin
             apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
@@ -497,9 +498,140 @@ module tiny_qspi_tb();
             for(i=0;i<31;i=i+1)
             begin
                 apb_xfer(32'h04,1'b0,datagen,apb_rddata);
-                if(data_src[i]!=apb_rdata)
+                $display("Read:0x%x",apb_rddata);
+                if(data_src[i]!=apb_rddata)
                 begin
-                    $display("Data Cmp fail! exp:0x%x got:0x%x",data_src[i],apb_rdata);
+                    $display("Data Cmp fail! exp:0x%x got:0x%x",data_src[i],apb_rddata);
+                    err_cnt++;
+                end
+            end
+            if(err_cnt===0)
+                $display("PSRAM W/R test pass!");
+        end
+        else
+            $display("Command sequence timeout!!!");
+    end
+    endtask
+
+    task cmd_sram_sdi_rw_test;
+    reg [15:0] timeout_cnt;
+    reg [31:0]datagen;
+    reg loop_escape;
+    integer i,err_cnt;
+    begin
+        $display("Start SRAM SDI R/W test!");
+        loop_escape=0;err_cnt=0;
+        apb_xfer(32'h18,1'b1,{20'h00000,12'hFFF},apb_rddata);//set longer limit
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h1},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h3B},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h0},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h02},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h78},apb_rddata);//write 128byte data
+        for(i=0;i<31;i=i+1)
+        begin
+            datagen=$random;
+            apb_xfer(32'h04,1'b1,datagen,apb_rddata);
+            data_src[i]=datagen;
+        end
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h0},apb_rddata);//write read cmd
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h5,8'h78},apb_rddata);//read 128byte data
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h1},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'hFF},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
+        begin
+            apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
+            loop_escape = (apb_rddata & 32'hC0)!=0;
+        end
+        if(loop_escape)
+        begin
+            err_cnt=0;
+            $display("Seems command sequence done!");
+            for(i=0;i<31;i=i+1)
+            begin
+                apb_xfer(32'h04,1'b0,datagen,apb_rddata);
+                $display("Read:0x%x",apb_rddata);
+                if(data_src[i]!=apb_rddata)
+                begin
+                    $display("Data Cmp fail! exp:0x%x got:0x%x",data_src[i],apb_rddata);
+                    err_cnt++;
+                end
+            end
+            if(err_cnt===0)
+                $display("PSRAM W/R test pass!");
+        end
+        else
+            $display("Command sequence timeout!!!");
+    end
+    endtask
+        
+    task cmd_sram_sqi_rw_test;
+    reg [15:0] timeout_cnt;
+    reg [31:0]datagen;
+    reg loop_escape;
+    integer i,err_cnt;
+    begin
+        $display("Start SRAM SQI R/W test!");
+        loop_escape=0;err_cnt=0;
+        apb_xfer(32'h18,1'b1,{20'h00000,12'hFFF},apb_rddata);//set longer limit
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h1},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h38},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h0},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h02},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h78},apb_rddata);//write 128byte data
+        for(i=0;i<31;i=i+1)
+        begin
+            datagen=$random;
+            apb_xfer(32'h04,1'b1,datagen,apb_rddata);
+            data_src[i]=datagen;
+        end
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h0},apb_rddata);//write read cmd
+        apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h7,8'h78},apb_rddata);//read 128byte data
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h1},apb_rddata);
+        apb_xfer(32'h04,1'b1,{24'h000000,8'hFF},apb_rddata);//write enter SDI CMD
+        apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
+
+        for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
+        begin
+            apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
+            loop_escape = (apb_rddata & 32'hC0)!=0;
+        end
+        if(loop_escape)
+        begin
+            err_cnt=0;
+            $display("Seems command sequence done!");
+            for(i=0;i<31;i=i+1)
+            begin
+                apb_xfer(32'h04,1'b0,datagen,apb_rddata);
+                $display("Read:0x%x",apb_rddata);
+                if(data_src[i]!=apb_rddata)
+                begin
+                    $display("Data Cmp fail! exp:0x%x got:0x%x",data_src[i],apb_rddata);
                     err_cnt++;
                 end
             end
@@ -578,6 +710,8 @@ module tiny_qspi_tb();
             cmd_loop_test(i);
         cmd_dummy_test($random);
         cmd_sram_spi_rw_test;
+        cmd_sram_sdi_rw_test;
+        cmd_sram_sqi_rw_test;
         $finish();
     end
 
