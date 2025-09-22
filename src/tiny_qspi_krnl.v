@@ -165,7 +165,7 @@ module tiny_qspi_krnl(
     always@(posedge clk or posedge rst_i)
     if(rst_i)
         op_end<=1'b1;
-    else if(spi_seq_next == IDLE )
+    else if((spi_seq_next == IDLE) && (spi_seq == IDLE))
         op_end<=1'b1;
     else
         op_end<=1'b0;

@@ -89,13 +89,13 @@ base+24 Command timeout
 
 Command: 
 	0x0XX SPI FSM Escape for {XX} cycles 
-	0x1XX SPI Tx for {XX} bytes
-	0x2XX SPI Rx for {XX} bytes 
-	0x3XX SPI Tx/Rx for {XX} bytes 
-	0x4XX DPI Tx for {XX} bytes
-	0x5XX DPI Rx for {XX} bytes
-	0x6XX QPI Tx for {XX} bytes
-	0x7XX QPI Rx for {XX} bytes
+	0x1XX SPI Tx for {XX}+Y bytes
+	0x2XX SPI Rx for {XX}+Y bytes 
+	0x3XX SPI Tx/Rx for {XX}+Y bytes 
+	0x4XX DPI Tx for {XX}+Y bytes
+	0x5XX DPI Rx for {XX}+Y bytes
+	0x6XX QPI Tx for {XX}+Y bytes
+	0x7XX QPI Rx for {XX}+Y bytes
 
 	0x8XX LUREO SPI Rx loop until selected bits = 1
 	0x9XX LUREZ SPI Rx loop until selected bits = 0
@@ -106,6 +106,7 @@ Command:
 
 	0xFXX Write {XX} into CS# register
 ```
+Note: Y could be 4 bytes if XX[1:0]=0
 
 This core uses zero-wait APB bus access. Clock crossing bridges between
 CPU and this core might reduce performance.

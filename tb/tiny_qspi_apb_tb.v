@@ -1,6 +1,6 @@
-`timescale 1ns/100ps
+`timescale 1ns/10ps
 
-module tiny_qspi_tb();
+module tiny_qspi_apb_tb();
 
 
     reg PCLK,PRESETn,APB2SPI_PWRITE,APB2SPI_PSEL,APB2SPI_PENABLE;//input
@@ -56,6 +56,7 @@ module tiny_qspi_tb();
         .HOLD_N_SIO3(QSPI_QDAT[3]), 
         .RESET(!PRESETn)
         );
+        /*
     W25Q128JVxIM Model_Flash
     (
         .CSn(MCS[0]), 
@@ -65,12 +66,12 @@ module tiny_qspi_tb();
         .WPn(QSPI_QDAT[2]), 
         .HOLDn(QSPI_QDAT[3])
     );
-
+*/
     initial
     forever 
     begin
-        #10  PCLK=1'b1;
-        #10  PCLK=1'b0;
+        #50  PCLK=1'b1;
+        #50  PCLK=1'b0;
     end
     reg [1:0] TEST_MODE=0; 
     reg [2:0] testsft_cnt;
@@ -225,7 +226,8 @@ module tiny_qspi_tb();
             @(posedge PCLK);
             timeout_cnt=timeout_cnt-1;
         end
-        apb_xfer(32'h4,1'b0,32'h00000000,data_out);
+        apb_xfer(32'h4,1'b0,32'h00000000,apb_rddata);
+        data_out = apb_rddata[15:0];
     end
     endtask
 
@@ -480,7 +482,8 @@ module tiny_qspi_tb();
             data_src[i]=datagen;
         end
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
-        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'hFF},apb_rddata);//wait 256 cycles
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h0},apb_rddata);//write read cmd
         apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
@@ -527,7 +530,7 @@ module tiny_qspi_tb();
         apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h1},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'h3B},apb_rddata);//write enter SDI CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h0},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'h02},apb_rddata);//write enter SDI CMD
@@ -539,18 +542,19 @@ module tiny_qspi_tb();
             data_src[i]=datagen;
         end
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
-        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'hFF},apb_rddata);//wait 8 byte
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h0},apb_rddata);//write read cmd
         apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'h5,8'h78},apb_rddata);//read 128byte data
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h4,8'h1},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'hFF},apb_rddata);//write enter SDI CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
         begin
             apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
@@ -592,7 +596,7 @@ module tiny_qspi_tb();
         apb_xfer(32'h14,1'b1,{20'h00000,4'h1,8'h1},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'h38},apb_rddata);//write enter SDI CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h0},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'h02},apb_rddata);//write enter SDI CMD
@@ -604,18 +608,18 @@ module tiny_qspi_tb();
             data_src[i]=datagen;
         end
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);//deselect
-        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'h08},apb_rddata);//wait 8 byte
+        apb_xfer(32'h14,1'b1,{20'h00000,4'h0,8'hFF},apb_rddata);//wait 8 byte
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h0},apb_rddata);//write read cmd
         apb_xfer(32'h04,1'b1,{24'h000000,8'h03},apb_rddata);//read CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'h7,8'h78},apb_rddata);//read 128byte data
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1101},apb_rddata);
         apb_xfer(32'h14,1'b1,{20'h00000,4'h6,8'h1},apb_rddata);
         apb_xfer(32'h04,1'b1,{24'h000000,8'hFF},apb_rddata);//write enter SDI CMD
         apb_xfer(32'h14,1'b1,{20'h00000,4'hF,8'b1111_1111},apb_rddata);
-
+        #10000;
         for(timeout_cnt=16'hFFFF;(timeout_cnt!=0 & (loop_escape==0));timeout_cnt=timeout_cnt-1)
         begin
             apb_xfer(32'h8,1'b0,32'h00000000,apb_rddata);
@@ -655,7 +659,7 @@ module tiny_qspi_tb();
         for(i=0;i<32;i=i+1) /*SPI aligned read test*/
         begin
             $display("run SPI read test #%d",i);
-            apb_read_test(2'b00,5'h0F,1'b0,apb_rddata);
+            apb_read_test(2'b00,5'h0F,1'b0,apb_rddata[15:0]);
             /*compare data TBD*/
         end
         for(i=0;i<32;i=i+1) /*SPI aligned write test*/
@@ -669,7 +673,7 @@ module tiny_qspi_tb();
         for(i=0;i<32;i=i+1) /*DPI aligned read test*/
         begin
             $display("run DPI read test #%d",i);
-            apb_read_test(2'b01,5'h07,1'b0,apb_rddata);
+            apb_read_test(2'b01,5'h07,1'b0,apb_rddata[15:0]);
             /*compare data TBD*/
         end
         for(i=0;i<32;i=i+1) /*DPI aligned write test*/
@@ -683,7 +687,7 @@ module tiny_qspi_tb();
         for(i=0;i<32;i=i+1) /*QPI aligned read test*/
         begin
             $display("run QPI read test #%d",i);
-            apb_read_test(2'b10,5'h03,1'b0,apb_rddata);
+            apb_read_test(2'b10,5'h03,1'b0,apb_rddata[15:0]);
             /*compare data TBD*/
         end
         for(i=0;i<32;i=i+1) /*QPI aligned write test*/
@@ -709,6 +713,8 @@ module tiny_qspi_tb();
         for(i=0;i<4;i=i+1)
             cmd_loop_test(i);
         cmd_dummy_test($random);
+        qspictl_reset;
+
         cmd_sram_spi_rw_test;
         cmd_sram_sdi_rw_test;
         cmd_sram_sqi_rw_test;
