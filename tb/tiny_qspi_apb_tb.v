@@ -698,15 +698,17 @@ module tiny_qspi_apb_tb();
             /*compare data TBD*/
         end
         /*command mode test*/
-        qspictl_reset;
+        //qspictl_reset;
         $display("Start testing CMD mode");
         apb_xfer(32'h0,1'b1,32'h40000000,apb_rddata);/*config at fastest cmd mode*/
         apb_xfer(32'h18,1'b1,32'h0000FFFF,apb_rddata);/*config at fastest cmd mode*/
         cmd_cstoggle_test;
         for(i=0;i<3;i=i+1)
         begin
+            qspictl_reset;
             $display("Start testing CMD read mode");
             cmd_read_test(i,8'hFF);
+            qspictl_reset;
             $display("Start testing CMD write mode");
             cmd_write_test(i,8'hFF);
         end

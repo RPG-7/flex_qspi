@@ -47,12 +47,16 @@
 |位      |代号      |读/写 |作用       |
 |-       |        -| -    |          -|
 |[31]    |CMDTO/RST|R/W1c |命令超时指示位，向该位写入将复位整个SPI状态机|
-|[27:4]  |RSVD     | -    |保留位   |
-|[5]     |RXFV     |R/W1c |RxFIFO有效事件|
-|[4]     |TXFE     |R/W1c |TxFIFO满事件 |
+|[27:10] |RSVD     | -    |保留位   |
+|[9]     |TXFF     | -    |TxFIFO满   |
+|[8]     |RXFF     | -    |RxFIFO满   |
+|[7]     |CMDFIN   | -    |命令全部完成   |
+|[6]     |CMDTO    |R     |命令超时   |
+|[5]     |RXFV     |R     |RxFIFO有效事件|
+|[4]     |TXFE     |R     |TxFIFO空事件  |
 |[3]     |RXFHE    |R/W1c |RxFIFO半空事件|
 |[2]     |TXFHF    |R/W1c |TxFIFO半满事件|
-|[1]     |RDY      |R     |SPI状态机空闲/命令FIFO空|
+|[1]     |RDY      |R     |SPI状态机空闲 |
 |[0]     |TXE      |R     |单次写结束|
 
 备注：R/W意味着读写功能不同，W1c意味着向该位写1清除对应
